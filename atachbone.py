@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import bpy
 import numpy as np
 import mathutils
 
+#頂点グループの設定を行う
 def setVertexGroup(selected):
     for i in range(len(selected)):
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -16,6 +19,7 @@ def setVertexGroup(selected):
         bpy.ops.object.vertex_group_assign()
     bpy.ops.object.mode_set(mode="OBJECT")
 
+#アーマチュアとボーンを作成する
 def createArmature(selected):
     bpy.ops.object.add(type='ARMATURE', enter_editmode=True, location=(0,0,0))
     amt = bpy.context.object
@@ -34,10 +38,18 @@ def createArmature(selected):
 
 def join(selected):
     #bpy.ops.object.select_all(action='DESELECT')
+    #オブジェクトの中心に設定するメッシュ
+    mesh = bpy.data.meshes.new("mesh")
+    obj  = bpy.data.objects.new("MeshObject", mesh)
+    scene = bpy.context.scene
+    scene.collection.objects.link(obj)
     for i in range(len(selected)):
         s = selected[i]
         s.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
     bpy.ops.object.join()
+    return obj
 
 def setPose(amt, selected):
     bpy.context.view_layer.objects.active = amt
@@ -52,33 +64,38 @@ def setPose(amt, selected):
         if bone.rotation_mode == 'QUATERNION':
             bone.rotation_quaternion = s.rotation_quaternion
             bone.keyframe_insert(data_path="rotation_quaternion",group=name)
-            print("qua")
         elif bone.rotation_mode == 'AXIS_ANGLE':
             bone.rotation_axis_angle = s.rotation_axis_angle
             bone.keyframe_insert(data_path="rotation_axis_angle",group=name)
-            print("axis")
         else:
             bone.rotation_euler = s.rotation_euler
             bone.keyframe_insert(data_path="rotation_euler",group=name)
-            print("euler")
-            print(s.rotation_euler)
-        #bone.lock_location = [True]*3
-        #bone.lock_rotation = [True] * 3
-        #bone.lock_rotation_w = True
-selected = bpy.context.selected_objects
-#bpy.ops.object.armature_add(enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-setVertexGroup(selected)
-amt = createArmature(selected)
+def deleteOtherActions():
+    #目的のアクション以外のアクションを全部消す
+    for action in bpy.data.actions:
+        if action.name != "PhysicsObjectAmtAction":
+            del(action)
 
-nStart = bpy.context.scene.frame_start
-nEnd = bpy.context.scene.frame_end
+if __name__ == "__main__":
+    selected = bpy.context.selected_objects
+    bpy.context.view_layer.objects.active = selected[0]
+    nStart = bpy.context.scene.frame_start
+    nEnd = bpy.context.scene.frame_end
+    bpy.context.scene.frame_set(nStart)
+    #キーフレームにベイクする
+    bpy.ops.rigidbody.bake_to_keyframes(frame_start=nStart, frame_end=nEnd)
+    setVertexGroup(selected)
+    amt = createArmature(selected)
 
-for t in range(nStart, nEnd + 1):
-    #if t % keyframe_freq != 0: continue
-    bpy.context.scene.frame_set(t)
-    setPose(amt,selected)
-    #s.vertex_groups.new(name="frag"+str(i))
-    #bpy.ops.object.vertex_group_assign()
-
-#join(selected)    
+    for t in range(nStart, nEnd + 1):
+        bpy.context.scene.frame_set(t)
+        setPose(amt,selected)
+    #最初の時間に戻る
+    bpy.context.scene.frame_set(nStart)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    deleteOtherActions()
+    obj = join(selected)    
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = amt
+    bpy.ops.object.parent_set(type='ARMATURE_NAME')
 
