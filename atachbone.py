@@ -4,6 +4,12 @@ import bpy
 import numpy as np
 import mathutils
 
+TEMP_FLAG_NAME = "__tempFragment__"
+VERTEX_GROUP_NAME="frag"
+ARMATURE_NAME="PhysicsObjectAmt"
+
+
+
 #頂点グループの設定を行う
 def setVertexGroup(selected):
     for i in range(len(selected)):
@@ -11,7 +17,7 @@ def setVertexGroup(selected):
         bpy.ops.object.select_all(action='DESELECT')
         s = selected[i]
         bpy.context.view_layer.objects.active = s
-        name = "frag" + str(i)
+        name = VERTEX_GROUP_NAME + str(i)
         if name not in s.vertex_groups.keys():
             vg = s.vertex_groups.new(name=name)
         bpy.ops.object.mode_set(mode='EDIT')
@@ -23,13 +29,13 @@ def setVertexGroup(selected):
 def createArmature(selected):
     bpy.ops.object.add(type='ARMATURE', enter_editmode=True, location=(0,0,0))
     amt = bpy.context.object
-    amt.name = "PhysicsObjectAmt"
+    amt.name = ARMATURE_NAME
     bpy.ops.armature.select_all(action='SELECT')
     bpy.ops.armature.delete()
     bpy.ops.object.mode_set(mode='EDIT')
     for i in range(len(selected)):
         s = selected[i]
-        b = amt.data.edit_bones.new('frag'+str(i))
+        b = amt.data.edit_bones.new(VERTEX_GROUP_NAME+str(i))
         b.head = s.location
         b.tail = s.location + mathutils.Vector((0,0.1,0))
 
@@ -72,14 +78,22 @@ def setPose(amt, selected):
             bone.keyframe_insert(data_path="rotation_euler",group=name)
 def deleteOtherActions():
     #目的のアクション以外のアクションを全部消す
+    wlen =  len(TEMP_FLAG_NAME)
     for action in bpy.data.actions:
-        if action.name != "PhysicsObjectAmtAction":
+        #if action.name != "PhysicsObjectAmtAction":
+        if action.name[0:wlen] == TEMP_FLAG_NAME:
             del(action)
+def renameFragments():
+    for i in range(len(selected)):
+        s = selected[i]
+        s.name = TEMP_FLAG_NAME+str(i)
+
 
 if __name__ == "__main__":
     selected = bpy.context.selected_objects
     bpy.context.view_layer.objects.active = selected[0]
     nStart = bpy.context.scene.frame_start
+    renameFragments()
     nEnd = bpy.context.scene.frame_end
     bpy.context.scene.frame_set(nStart)
     #キーフレームにベイクする
